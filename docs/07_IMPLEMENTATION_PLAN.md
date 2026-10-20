@@ -2,11 +2,16 @@
 
 Status at document creation: specifications only; every milestone NOT STARTED. Update status only after verifiable work.
 
-## M1: contracts and ingestion
+## M1: contracts and ingestion — LOCAL COMPLETE; CI VERIFIED (commit 511daf8)
 Implement packaging, typed models, CSV parsers, strict validation, duplicate semantics and fixtures. Tests cover valid and malformed inputs. Exit: exact diagnostics and reconciliation counts; no policy code necessary yet.
 
-## M2: policy and evidence
+## M2: policy and evidence — LOCAL COMPLETE; CI PENDING
 Implement validated JSON policy, explicit as-of/freshness, first-match evaluator and deterministic ordering. Exit: all policy unit cases and reviewed synthetic expected outputs pass. Explain policy tradeoffs in plain language.
+
+Local: 135/135 tests pass; ruff check clean; ruff format clean.
+Files: src/triageledger/policy.py, src/triageledger/models.py (PolicyConfig/EvidenceSummary/Decision),
+  policies/demo-policy-v1.json, tests/unit/test_policy.py, tests/integration/test_evaluate.py.
+CI status: pending remote run on pushed commit.
 
 ## M3: outputs and replay
 Implement CLI orchestration, JSON/CSV/Markdown rendering, manifest hashes, injection mitigations, atomic publication and exits. Exit: clean-checkout demo, output failure tests, byte-level replay and readable briefing.

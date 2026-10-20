@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -161,3 +162,113 @@ class IngestResult:
                 raw_value=raw_value,
             )
         )
+
+
+# ---------------------------------------------------------------------------
+# Policy configuration
+# ---------------------------------------------------------------------------
+
+# Required rule sequence for demo-policy-v1. Validation enforces this exactly.
+REQUIRED_RULE_SEQUENCE: tuple[str, ...] = (
+    "EX-01",
+    "P-01",
+    "P-02",
+    "P-03",
+    "P-04",
+    "P-05",
+    "P-06",
+    "P-07",
+)
+
+
+@dataclass(frozen=True)
+class PolicyConfig:
+    """Validated policy configuration loaded from JSON.
+
+    Approved interpretations documented here for traceability:
+    - context_freshness_days: age > threshold means stale; exactly at threshold is fresh.
+    - evidence_freshness_days: same boundary semantics.
+    - rules: must match REQUIRED_RULE_SEQUENCE exactly; no substitutions in v1.
+    - Freshness thresholds must be positive integers; booleans are rejected.
+    """
+
+    policy_id: str
+    version: str
+    description: str
+    context_freshness_days: int
+    evidence_freshness_days: int
+    rules: tuple[str, ...]
+
+
+# ---------------------------------------------------------------------------
+# Evidence aggregation result
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class EvidenceSummary:
+    """Aggregated evidence state for a single vulnerability_id.
+
+    Approved exploitation aggregation rules (from M2 approval):
+    1. Any fresh active evidence → effective_exploitation = active.
+    2. Otherwise any stale active evidence → unknown (even if fresh not_observed exists).
+    3. Otherwise any fresh not_observed evidence → not_observed.
+    4. Otherwise → unknown.
+
+    Flag semantics (from M2 approval):
+    - threat_unknown: effective_exploitation is unknown.
+    - threat_stale: any supplied evidence row is stale.
+    - historical_active: any supplied active evidence row is stale (coexists with active effective).
+    - conflicting_threat_evidence: evidence contains both active and not_observed statuses,
+      regardless of freshness. Requests analyst interpretation; not a source-quality judgment.
+    """
+
+    vulnerability_id: str
+    effective_exploitation: ExploitationStatus
+    evidence_ids: tuple[str, ...]  # all evidence IDs for this vulnerability
+    threat_unknown: bool
+    threat_stale: bool
+    historical_active: bool
+    conflicting_threat_evidence: bool
+
+
+# ---------------------------------------------------------------------------
+# Decision (structured output per finding)
+# ---------------------------------------------------------------------------
+
+DECISION_SCHEMA_VERSION = "1.0"
+
+
+@dataclass
+class Decision:
+    """Structured triage decision for a single finding.
+
+    Produced by the policy evaluator. M3 rendering reads these fields directly.
+    supporting_facts is a plain dict of string-keyed scalar/list values for
+    template-driven explanations; do not execute its contents.
+    """
+
+    schema_version: str
+    finding_id: str
+    asset_id: str
+    vulnerability_id: str | None
+    disposition: str  # "review_recommended" | "not_affected"
+    priority: str | None  # "P1" | "P2" | "P3" | "P4" | None (excluded)
+    rule_id: str  # e.g. "EX-01", "P-01" … "P-07"
+    rule_version: str  # policy.version
+    explanation: str  # template-derived; never generated prose
+    supporting_facts: dict[str, Any]
+    evidence_ids: tuple[str, ...]
+    flags: frozenset[str]
+    owner_team: str | None
+    next_action: str
+    as_of: datetime
+    context_age_days: float | None  # None when asset is unmatched
+    # Effective values used for rule evaluation
+    effective_criticality: BusinessCriticality
+    effective_exposure: InternetExposure
+    effective_exploitation: ExploitationStatus
+    # Original values from the asset row (None when asset is unmatched)
+    original_criticality: BusinessCriticality | None
+    original_exposure: InternetExposure | None
+    detected_at: datetime

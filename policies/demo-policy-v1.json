@@ -1,8 +1,17 @@
 {
   "policy_id": "demo-policy-v1",
   "version": "1.0.0",
-  "description": "Illustrative triage policy for TriageLedger portfolio prototype. Not an organizational mandate.",
+  "description": "Illustrative triage policy for TriageLedger portfolio prototype. Not an organizational mandate, NIST/CISA compliance, or IEX requirement.",
   "context_freshness_days": 30,
   "evidence_freshness_days": 7,
-  "rules": []
+  "rules": [
+    "EX-01",
+    "P-01",
+    "P-02",
+    "P-03",
+    "P-04",
+    "P-05",
+    "P-06",
+    "P-07"
+  ]
 }
