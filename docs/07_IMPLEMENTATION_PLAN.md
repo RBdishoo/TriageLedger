@@ -13,8 +13,16 @@ Files: src/triageledger/policy.py, src/triageledger/models.py (PolicyConfig/Evid
   policies/demo-policy-v1.json, tests/unit/test_policy.py, tests/integration/test_evaluate.py.
 CI status: pending remote run on pushed commit.
 
-## M3: outputs and replay
+## M3: outputs and replay — LOCAL COMPLETE; CI PENDING
 Implement CLI orchestration, JSON/CSV/Markdown rendering, manifest hashes, injection mitigations, atomic publication and exits. Exit: clean-checkout demo, output failure tests, byte-level replay and readable briefing.
+
+Local: 230/230 tests pass; ruff check clean; ruff format clean.
+Files: src/triageledger/cli.py, src/triageledger/reporting.py,
+  tests/unit/test_reporting.py, tests/integration/test_cli.py, .gitignore.
+Demo command exits 3 (13/16 decisions flagged); all six artifacts produced.
+Limitations: rename-based publication is not crash-safe or concurrency-safe;
+  --overwrite deferred to v2 (fresh output directory always required).
+CI status: pending remote run on pushed commit.
 
 ## M4: proof of work
 Create severity-only comparator, three evidence-based decision diffs, README, architecture diagram in text, limitations and CI. Measure performance if time permits; never insert placeholder metrics as real results. Exit: user can present a 3-minute demo and defend the rules without Claude.

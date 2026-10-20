@@ -208,6 +208,9 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# Runtime-generated triage artifacts
+artifacts/
+
 # PyPI configuration file
 .pypirc
 
