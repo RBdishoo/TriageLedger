@@ -1,0 +1,655 @@
+{
+  "run_id": "1c4fe6bfc924c935e29b2e570f85bbc4d7a4d8886f1ba02123ffaf51db46cf86",
+  "as_of": "2026-10-19T00:00:00+00:00",
+  "policy_id": "demo-policy-v1",
+  "policy_version": "1.0.0",
+  "decision_count": 16,
+  "decisions": [
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-001",
+      "asset_id": "A-001",
+      "vulnerability_id": "SYN-001",
+      "disposition": "review_recommended",
+      "priority": "P1",
+      "rule_id": "P-01",
+      "rule_version": "1.0.0",
+      "explanation": "Active exploitation confirmed with confirmed applicability. Immediate analyst review of applicability, exposure, and remediation options required.",
+      "supporting_facts": {
+        "severity": "high",
+        "applicability": "confirmed",
+        "effective_criticality": "critical",
+        "effective_exposure": "exposed",
+        "effective_exploitation": "active",
+        "original_criticality": "critical",
+        "original_exposure": "exposed",
+        "context_age_days": 18.0,
+        "evidence_ids": [
+          "E-001",
+          "E-009"
+        ]
+      },
+      "evidence_ids": [
+        "E-001",
+        "E-009"
+      ],
+      "flags": [
+        "conflicting_threat_evidence"
+      ],
+      "owner_team": "trading-ops",
+      "next_action": "Urgent analyst review: confirm applicability, assess exposure, and evaluate remediation options.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 18.0,
+      "effective_criticality": "critical",
+      "effective_exposure": "exposed",
+      "effective_exploitation": "active",
+      "original_criticality": "critical",
+      "original_exposure": "exposed",
+      "detected_at": "2026-10-05T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-002",
+      "asset_id": "A-001",
+      "vulnerability_id": "SYN-002",
+      "disposition": "review_recommended",
+      "priority": "P1",
+      "rule_id": "P-01",
+      "rule_version": "1.0.0",
+      "explanation": "Active exploitation confirmed with confirmed applicability. Immediate analyst review of applicability, exposure, and remediation options required.",
+      "supporting_facts": {
+        "severity": "critical",
+        "applicability": "confirmed",
+        "effective_criticality": "critical",
+        "effective_exposure": "exposed",
+        "effective_exploitation": "active",
+        "original_criticality": "critical",
+        "original_exposure": "exposed",
+        "context_age_days": 18.0,
+        "evidence_ids": [
+          "E-002"
+        ]
+      },
+      "evidence_ids": [
+        "E-002"
+      ],
+      "flags": [],
+      "owner_team": "trading-ops",
+      "next_action": "Urgent analyst review: confirm applicability, assess exposure, and evaluate remediation options.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 18.0,
+      "effective_criticality": "critical",
+      "effective_exposure": "exposed",
+      "effective_exploitation": "active",
+      "original_criticality": "critical",
+      "original_exposure": "exposed",
+      "detected_at": "2026-10-06T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-003",
+      "asset_id": "A-002",
+      "vulnerability_id": "SYN-003",
+      "disposition": "review_recommended",
+      "priority": "P1",
+      "rule_id": "P-02",
+      "rule_version": "1.0.0",
+      "explanation": "Internet-exposed critical asset with critical or high severity. Immediate analyst review of applicability, exposure, and remediation options required.",
+      "supporting_facts": {
+        "severity": "high",
+        "applicability": "confirmed",
+        "effective_criticality": "critical",
+        "effective_exposure": "exposed",
+        "effective_exploitation": "not_observed",
+        "original_criticality": "critical",
+        "original_exposure": "exposed",
+        "context_age_days": 9.0,
+        "evidence_ids": [
+          "E-003"
+        ]
+      },
+      "evidence_ids": [
+        "E-003"
+      ],
+      "flags": [],
+      "owner_team": "market-data",
+      "next_action": "Urgent analyst review: confirm applicability, assess exposure, and evaluate remediation options.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 9.0,
+      "effective_criticality": "critical",
+      "effective_exposure": "exposed",
+      "effective_exploitation": "not_observed",
+      "original_criticality": "critical",
+      "original_exposure": "exposed",
+      "detected_at": "2026-10-07T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-006",
+      "asset_id": "A-005",
+      "vulnerability_id": "SYN-001",
+      "disposition": "review_recommended",
+      "priority": "P1",
+      "rule_id": "P-01",
+      "rule_version": "1.0.0",
+      "explanation": "Active exploitation confirmed with confirmed applicability. Immediate analyst review of applicability, exposure, and remediation options required.",
+      "supporting_facts": {
+        "severity": "high",
+        "applicability": "confirmed",
+        "effective_criticality": "critical",
+        "effective_exposure": "exposed",
+        "effective_exploitation": "active",
+        "original_criticality": "critical",
+        "original_exposure": "exposed",
+        "context_age_days": 1.0,
+        "evidence_ids": [
+          "E-001",
+          "E-009"
+        ]
+      },
+      "evidence_ids": [
+        "E-001",
+        "E-009"
+      ],
+      "flags": [
+        "conflicting_threat_evidence"
+      ],
+      "owner_team": "platform",
+      "next_action": "Urgent analyst review: confirm applicability, assess exposure, and evaluate remediation options.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 1.0,
+      "effective_criticality": "critical",
+      "effective_exposure": "exposed",
+      "effective_exploitation": "active",
+      "original_criticality": "critical",
+      "original_exposure": "exposed",
+      "detected_at": "2026-10-10T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-007",
+      "asset_id": "A-005",
+      "vulnerability_id": "SYN-001",
+      "disposition": "review_recommended",
+      "priority": "P1",
+      "rule_id": "P-01",
+      "rule_version": "1.0.0",
+      "explanation": "Active exploitation confirmed with confirmed applicability. Immediate analyst review of applicability, exposure, and remediation options required.",
+      "supporting_facts": {
+        "severity": "high",
+        "applicability": "confirmed",
+        "effective_criticality": "critical",
+        "effective_exposure": "exposed",
+        "effective_exploitation": "active",
+        "original_criticality": "critical",
+        "original_exposure": "exposed",
+        "context_age_days": 1.0,
+        "evidence_ids": [
+          "E-001",
+          "E-009"
+        ]
+      },
+      "evidence_ids": [
+        "E-001",
+        "E-009"
+      ],
+      "flags": [
+        "conflicting_threat_evidence",
+        "possible_duplicate"
+      ],
+      "owner_team": "platform",
+      "next_action": "Urgent analyst review: confirm applicability, assess exposure, and evaluate remediation options.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 1.0,
+      "effective_criticality": "critical",
+      "effective_exposure": "exposed",
+      "effective_exploitation": "active",
+      "original_criticality": "critical",
+      "original_exposure": "exposed",
+      "detected_at": "2026-10-10T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-014",
+      "asset_id": "A-011",
+      "vulnerability_id": "SYN-004",
+      "disposition": "review_recommended",
+      "priority": "P1",
+      "rule_id": "P-02",
+      "rule_version": "1.0.0",
+      "explanation": "Internet-exposed critical asset with critical or high severity. Immediate analyst review of applicability, exposure, and remediation options required.",
+      "supporting_facts": {
+        "severity": "critical",
+        "applicability": "confirmed",
+        "effective_criticality": "critical",
+        "effective_exposure": "exposed",
+        "effective_exploitation": "unknown",
+        "original_criticality": "critical",
+        "original_exposure": "exposed",
+        "context_age_days": 11.0,
+        "evidence_ids": [
+          "E-004"
+        ]
+      },
+      "evidence_ids": [
+        "E-004"
+      ],
+      "flags": [
+        "historical_active",
+        "threat_stale",
+        "threat_unknown"
+      ],
+      "owner_team": "platform",
+      "next_action": "Urgent analyst review: confirm applicability, assess exposure, and evaluate remediation options.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 11.0,
+      "effective_criticality": "critical",
+      "effective_exposure": "exposed",
+      "effective_exploitation": "unknown",
+      "original_criticality": "critical",
+      "original_exposure": "exposed",
+      "detected_at": "2026-10-15T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-004",
+      "asset_id": "A-003",
+      "vulnerability_id": "SYN-004",
+      "disposition": "review_recommended",
+      "priority": "P2",
+      "rule_id": "P-03",
+      "rule_version": "1.0.0",
+      "explanation": "Critical severity or active exploitation present. Expedited investigation required.",
+      "supporting_facts": {
+        "severity": "critical",
+        "applicability": "confirmed",
+        "effective_criticality": "standard",
+        "effective_exposure": "not_exposed",
+        "effective_exploitation": "unknown",
+        "original_criticality": "standard",
+        "original_exposure": "not_exposed",
+        "context_age_days": 4.0,
+        "evidence_ids": [
+          "E-004"
+        ]
+      },
+      "evidence_ids": [
+        "E-004"
+      ],
+      "flags": [
+        "historical_active",
+        "threat_stale",
+        "threat_unknown"
+      ],
+      "owner_team": "analytics",
+      "next_action": "Expedited investigation required.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 4.0,
+      "effective_criticality": "standard",
+      "effective_exposure": "not_exposed",
+      "effective_exploitation": "unknown",
+      "original_criticality": "standard",
+      "original_exposure": "not_exposed",
+      "detected_at": "2026-10-08T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-011",
+      "asset_id": "A-008",
+      "vulnerability_id": "SYN-008",
+      "disposition": "review_recommended",
+      "priority": "P2",
+      "rule_id": "P-06",
+      "rule_version": "1.0.0",
+      "explanation": "Severity unknown: conservative P2 default applied. Expedited clarification of severity required.",
+      "supporting_facts": {
+        "severity": "unknown",
+        "applicability": "confirmed",
+        "effective_criticality": "standard",
+        "effective_exposure": "not_exposed",
+        "effective_exploitation": "not_observed",
+        "original_criticality": "standard",
+        "original_exposure": "not_exposed",
+        "context_age_days": 5.0,
+        "evidence_ids": [
+          "E-007"
+        ]
+      },
+      "evidence_ids": [
+        "E-007"
+      ],
+      "flags": [
+        "severity_unknown"
+      ],
+      "owner_team": "operations",
+      "next_action": "Expedited investigation required.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 5.0,
+      "effective_criticality": "standard",
+      "effective_exposure": "not_exposed",
+      "effective_exploitation": "not_observed",
+      "original_criticality": "standard",
+      "original_exposure": "not_exposed",
+      "detected_at": "2026-10-11T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-005",
+      "asset_id": "A-004",
+      "vulnerability_id": "SYN-005",
+      "disposition": "review_recommended",
+      "priority": "P3",
+      "rule_id": "P-05",
+      "rule_version": "1.0.0",
+      "explanation": "High or medium severity finding. Schedule for planned remediation review.",
+      "supporting_facts": {
+        "severity": "medium",
+        "applicability": "unconfirmed",
+        "effective_criticality": "unknown",
+        "effective_exposure": "unknown",
+        "effective_exploitation": "unknown",
+        "original_criticality": "standard",
+        "original_exposure": "not_exposed",
+        "context_age_days": 48.0,
+        "evidence_ids": [
+          "E-005"
+        ]
+      },
+      "evidence_ids": [
+        "E-005"
+      ],
+      "flags": [
+        "applicability_unconfirmed",
+        "context_stale",
+        "criticality_unknown",
+        "exposure_unknown",
+        "owner_unverified",
+        "threat_stale",
+        "threat_unknown"
+      ],
+      "owner_team": "engineering",
+      "next_action": "Schedule for planned remediation review. Assign owner team before scheduling remediation.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 48.0,
+      "effective_criticality": "unknown",
+      "effective_exposure": "unknown",
+      "effective_exploitation": "unknown",
+      "original_criticality": "standard",
+      "original_exposure": "not_exposed",
+      "detected_at": "2026-09-15T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-009",
+      "asset_id": "A-006",
+      "vulnerability_id": null,
+      "disposition": "review_recommended",
+      "priority": "P3",
+      "rule_id": "P-05",
+      "rule_version": "1.0.0",
+      "explanation": "High or medium severity finding. Schedule for planned remediation review.",
+      "supporting_facts": {
+        "severity": "medium",
+        "applicability": "confirmed",
+        "effective_criticality": "standard",
+        "effective_exposure": "not_exposed",
+        "effective_exploitation": "unknown",
+        "original_criticality": "standard",
+        "original_exposure": "not_exposed",
+        "context_age_days": 14.0,
+        "evidence_ids": []
+      },
+      "evidence_ids": [],
+      "flags": [
+        "missing_vulnerability_id",
+        "owner_missing",
+        "threat_unknown"
+      ],
+      "owner_team": null,
+      "next_action": "Schedule for planned remediation review. Assign owner team before scheduling remediation.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 14.0,
+      "effective_criticality": "standard",
+      "effective_exposure": "not_exposed",
+      "effective_exploitation": "unknown",
+      "original_criticality": "standard",
+      "original_exposure": "not_exposed",
+      "detected_at": "2026-10-02T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-012",
+      "asset_id": "A-009",
+      "vulnerability_id": "SYN-009",
+      "disposition": "review_recommended",
+      "priority": "P3",
+      "rule_id": "P-05",
+      "rule_version": "1.0.0",
+      "explanation": "High or medium severity finding. Schedule for planned remediation review.",
+      "supporting_facts": {
+        "severity": "high",
+        "applicability": "confirmed",
+        "effective_criticality": "unknown",
+        "effective_exposure": "unknown",
+        "effective_exploitation": "unknown",
+        "original_criticality": "unknown",
+        "original_exposure": "unknown",
+        "context_age_days": 110.0,
+        "evidence_ids": [
+          "E-008"
+        ]
+      },
+      "evidence_ids": [
+        "E-008"
+      ],
+      "flags": [
+        "context_stale",
+        "criticality_unknown",
+        "exposure_unknown",
+        "historical_active",
+        "owner_missing",
+        "owner_unverified",
+        "threat_stale",
+        "threat_unknown"
+      ],
+      "owner_team": null,
+      "next_action": "Schedule for planned remediation review. Assign owner team before scheduling remediation.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 110.0,
+      "effective_criticality": "unknown",
+      "effective_exposure": "unknown",
+      "effective_exploitation": "unknown",
+      "original_criticality": "unknown",
+      "original_exposure": "unknown",
+      "detected_at": "2026-10-13T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-015",
+      "asset_id": "A-012",
+      "vulnerability_id": "SYN-011",
+      "disposition": "review_recommended",
+      "priority": "P3",
+      "rule_id": "P-05",
+      "rule_version": "1.0.0",
+      "explanation": "High or medium severity finding. Schedule for planned remediation review.",
+      "supporting_facts": {
+        "severity": "medium",
+        "applicability": "unconfirmed",
+        "effective_criticality": "standard",
+        "effective_exposure": "not_exposed",
+        "effective_exploitation": "unknown",
+        "original_criticality": "standard",
+        "original_exposure": "not_exposed",
+        "context_age_days": 3.0,
+        "evidence_ids": []
+      },
+      "evidence_ids": [],
+      "flags": [
+        "applicability_unconfirmed",
+        "threat_unknown"
+      ],
+      "owner_team": "engineering",
+      "next_action": "Schedule for planned remediation review.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 3.0,
+      "effective_criticality": "standard",
+      "effective_exposure": "not_exposed",
+      "effective_exploitation": "unknown",
+      "original_criticality": "standard",
+      "original_exposure": "not_exposed",
+      "detected_at": "2026-10-16T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-016",
+      "asset_id": "UNMATCHED-999",
+      "vulnerability_id": "SYN-012",
+      "disposition": "review_recommended",
+      "priority": "P3",
+      "rule_id": "P-05",
+      "rule_version": "1.0.0",
+      "explanation": "High or medium severity finding. Schedule for planned remediation review.",
+      "supporting_facts": {
+        "severity": "high",
+        "applicability": "confirmed",
+        "effective_criticality": "unknown",
+        "effective_exposure": "unknown",
+        "effective_exploitation": "unknown",
+        "original_criticality": null,
+        "original_exposure": null,
+        "context_age_days": null,
+        "evidence_ids": []
+      },
+      "evidence_ids": [],
+      "flags": [
+        "asset_unmatched",
+        "context_missing",
+        "criticality_unknown",
+        "exposure_unknown",
+        "threat_unknown"
+      ],
+      "owner_team": null,
+      "next_action": "Schedule for planned remediation review.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": null,
+      "effective_criticality": "unknown",
+      "effective_exposure": "unknown",
+      "effective_exploitation": "unknown",
+      "original_criticality": null,
+      "original_exposure": null,
+      "detected_at": "2026-10-17T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-008",
+      "asset_id": "A-006",
+      "vulnerability_id": "SYN-006",
+      "disposition": "review_recommended",
+      "priority": "P4",
+      "rule_id": "P-07",
+      "rule_version": "1.0.0",
+      "explanation": "Low severity finding. Routine review.",
+      "supporting_facts": {
+        "severity": "low",
+        "applicability": "confirmed",
+        "effective_criticality": "standard",
+        "effective_exposure": "not_exposed",
+        "effective_exploitation": "unknown",
+        "original_criticality": "standard",
+        "original_exposure": "not_exposed",
+        "context_age_days": 14.0,
+        "evidence_ids": []
+      },
+      "evidence_ids": [],
+      "flags": [
+        "owner_missing",
+        "threat_unknown"
+      ],
+      "owner_team": null,
+      "next_action": "Routine review. Assign owner team before scheduling remediation.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 14.0,
+      "effective_criticality": "standard",
+      "effective_exposure": "not_exposed",
+      "effective_exploitation": "unknown",
+      "original_criticality": "standard",
+      "original_exposure": "not_exposed",
+      "detected_at": "2026-10-01T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-013",
+      "asset_id": "A-010",
+      "vulnerability_id": "SYN-010",
+      "disposition": "review_recommended",
+      "priority": "P4",
+      "rule_id": "P-07",
+      "rule_version": "1.0.0",
+      "explanation": "Low severity finding. Routine review.",
+      "supporting_facts": {
+        "severity": "low",
+        "applicability": "confirmed",
+        "effective_criticality": "standard",
+        "effective_exposure": "not_exposed",
+        "effective_exploitation": "unknown",
+        "original_criticality": "standard",
+        "original_exposure": "not_exposed",
+        "context_age_days": 2.0,
+        "evidence_ids": []
+      },
+      "evidence_ids": [],
+      "flags": [
+        "threat_unknown"
+      ],
+      "owner_team": "platform",
+      "next_action": "Routine review.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 2.0,
+      "effective_criticality": "standard",
+      "effective_exposure": "not_exposed",
+      "effective_exploitation": "unknown",
+      "original_criticality": "standard",
+      "original_exposure": "not_exposed",
+      "detected_at": "2026-10-14T00:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "finding_id": "F-010",
+      "asset_id": "A-007",
+      "vulnerability_id": "SYN-007",
+      "disposition": "not_affected",
+      "priority": null,
+      "rule_id": "EX-01",
+      "rule_version": "1.0.0",
+      "explanation": "Applicability is not_affected per supplied data. Record retained for analyst validation; do not treat as verified remediation.",
+      "supporting_facts": {
+        "severity": "critical",
+        "applicability": "not_affected",
+        "effective_criticality": "critical",
+        "effective_exposure": "exposed",
+        "effective_exploitation": "active",
+        "original_criticality": "critical",
+        "original_exposure": "exposed",
+        "context_age_days": 7.0,
+        "evidence_ids": [
+          "E-006"
+        ]
+      },
+      "evidence_ids": [
+        "E-006"
+      ],
+      "flags": [],
+      "owner_team": "security",
+      "next_action": "Retain supplied not_affected assertion for analyst validation. Do not treat as verified remediation.",
+      "as_of": "2026-10-19T00:00:00+00:00",
+      "context_age_days": 7.0,
+      "effective_criticality": "critical",
+      "effective_exposure": "exposed",
+      "effective_exploitation": "active",
+      "original_criticality": "critical",
+      "original_exposure": "exposed",
+      "detected_at": "2026-10-09T00:00:00+00:00"
+    }
+  ]
+}

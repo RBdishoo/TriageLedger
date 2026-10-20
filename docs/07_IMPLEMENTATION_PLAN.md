@@ -24,8 +24,18 @@ Limitations: rename-based publication is not crash-safe or concurrency-safe;
   --overwrite deferred to v2 (fresh output directory always required).
 CI status: pending remote run on pushed commit.
 
-## M4: proof of work
+## M4: proof of work — LOCAL COMPLETE; CI PENDING
 Create severity-only comparator, three evidence-based decision diffs, README, architecture diagram in text, limitations and CI. Measure performance if time permits; never insert placeholder metrics as real results. Exit: user can present a 3-minute demo and defend the rules without Claude.
+
+Local: no source code changes; all 230 tests pass; ruff check clean; ruff format clean.
+Files: docs/comparison.md (new), README.md (updated), samples/demo/ (6 committed artifacts),
+  docs/09_CTO_DEMO.md (concrete script added), docs/07_IMPLEMENTATION_PLAN.md (this update).
+Demo: exit 3, 16 decisions (15 actionable + 1 excluded), 6 artifacts byte-identical across runs.
+Three comparison examples (as-of 2026-10-19T00:00:00Z, demo-policy-v1 v1.0.0):
+  F-001 high severity: baseline pos 4 → context pos 1 (rule P-01, active exploitation)
+  F-004 critical severity: baseline pos 2 → context pos 7 (rule P-03, standard asset)
+  F-011 unknown severity: baseline pos 15 → context pos 8 (rule P-06, review required)
+CI status: pending remote run on pushed commit.
 
 ## M5: reviewer-driven refinement
 Collect actual feedback when available; log feedback, make bounded changes and retain regression tests. Optional workflow persistence for analyst decisions requires separate schema/ADR; do not fake implemented overrides in CLI v1.

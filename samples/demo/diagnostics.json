@@ -1,0 +1,38 @@
+{
+  "run_id": "1c4fe6bfc924c935e29b2e570f85bbc4d7a4d8886f1ba02123ffaf51db46cf86",
+  "as_of": "2026-10-19T00:00:00+00:00",
+  "files": [
+    {
+      "source_file": "samples/assets.csv",
+      "total_rows_read": 12,
+      "accepted": 12,
+      "collapsed_duplicates": 0,
+      "fatal": false,
+      "diagnostics": []
+    },
+    {
+      "source_file": "samples/findings.csv",
+      "total_rows_read": 16,
+      "accepted": 16,
+      "collapsed_duplicates": 0,
+      "fatal": false,
+      "diagnostics": [
+        {
+          "level": "info",
+          "source_file": "samples/findings.csv",
+          "row_number": 8,
+          "field_name": "finding_id",
+          "message": "possible_duplicate: asset_id 'A-005' + vulnerability_id 'SYN-001' also appears in finding_id 'F-006'"
+        }
+      ]
+    },
+    {
+      "source_file": "samples/threat_evidence.csv",
+      "total_rows_read": 9,
+      "accepted": 9,
+      "collapsed_duplicates": 0,
+      "fatal": false,
+      "diagnostics": []
+    }
+  ]
+}
