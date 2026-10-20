@@ -1,0 +1,10 @@
+evidence_id,vulnerability_id,exploitation_status,source_label,source_reference,observed_at
+E-001,SYN-001,active,Synthetic Scenario A,synthetic://scenario-a/SYN-001,2026-10-17T00:00:00Z
+E-002,SYN-002,active,Synthetic Scenario A,synthetic://scenario-a/SYN-002,2026-10-18T00:00:00Z
+E-003,SYN-003,not_observed,Synthetic Scenario B,synthetic://scenario-b/SYN-003,2026-10-16T00:00:00Z
+E-004,SYN-004,active,Synthetic Scenario A,synthetic://scenario-a/SYN-004,2026-10-10T00:00:00Z
+E-005,SYN-005,unknown,Synthetic Scenario C,synthetic://scenario-c/SYN-005,2026-10-01T00:00:00Z
+E-006,SYN-007,active,Synthetic Scenario A,synthetic://scenario-a/SYN-007,2026-10-12T00:00:00Z
+E-007,SYN-008,not_observed,Synthetic Scenario B,synthetic://scenario-b/SYN-008,2026-10-18T00:00:00Z
+E-008,SYN-009,active,Synthetic Scenario A,synthetic://scenario-a/SYN-009,2026-10-01T00:00:00Z
+E-009,SYN-001,not_observed,Synthetic Scenario B,synthetic://scenario-b/SYN-001,2026-10-18T00:00:00Z

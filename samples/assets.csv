@@ -1,0 +1,13 @@
+asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at
+A-001,Order Router Alpha,critical,exposed,trading-ops,2026-10-01T00:00:00Z
+A-002,Market Data Feed Beta,critical,exposed,market-data,2026-10-10T00:00:00Z
+A-003,Internal Reporting DB,standard,not_exposed,analytics,2026-10-15T00:00:00Z
+A-004,Dev Sandbox Host,standard,not_exposed,engineering,2026-09-01T00:00:00Z
+A-005,Public API Gateway,critical,exposed,platform,2026-10-18T00:00:00Z
+A-006,Log Aggregator,standard,not_exposed,,2026-10-05T00:00:00Z
+A-007,Auth Service,critical,exposed,security,2026-10-12T00:00:00Z
+A-008,Batch Reconciler,standard,not_exposed,operations,2026-10-14T00:00:00Z
+A-009,Config Store,unknown,unknown,,2026-07-01T00:00:00Z
+A-010,Monitoring Agent,standard,not_exposed,platform,2026-10-17T00:00:00Z
+A-011,Legacy Gateway,critical,exposed,platform,2026-10-08T00:00:00Z
+A-012,Internal Wiki,standard,not_exposed,engineering,2026-10-16T00:00:00Z

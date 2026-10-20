@@ -1,0 +1,8 @@
+{
+  "policy_id": "demo-policy-v1",
+  "version": "1.0.0",
+  "description": "Illustrative triage policy for TriageLedger portfolio prototype. Not an organizational mandate.",
+  "context_freshness_days": 30,
+  "evidence_freshness_days": 7,
+  "rules": []
+}

@@ -1,0 +1,17 @@
+finding_id,asset_id,vulnerability_id,severity,applicability,detected_at,description
+F-001,A-001,SYN-001,high,confirmed,2026-10-05T00:00:00Z,Remote code execution in dependency — confirmed applicable to running version
+F-002,A-001,SYN-002,critical,confirmed,2026-10-06T00:00:00Z,Auth bypass in upstream library — active exploitation reported
+F-003,A-002,SYN-003,high,confirmed,2026-10-07T00:00:00Z,Memory corruption in feed parser
+F-004,A-003,SYN-004,critical,confirmed,2026-10-08T00:00:00Z,SQL injection surface in reporting module
+F-005,A-004,SYN-005,medium,unconfirmed,2026-09-15T00:00:00Z,Possible path traversal; applicability unconfirmed in sandbox
+F-006,A-005,SYN-001,high,confirmed,2026-10-10T00:00:00Z,Same RCE as F-001 but on public-facing API gateway
+F-007,A-005,SYN-001,high,confirmed,2026-10-10T00:00:00Z,Same RCE as F-001 but on public-facing API gateway
+F-008,A-006,SYN-006,low,confirmed,2026-10-01T00:00:00Z,Information disclosure in log output
+F-009,A-006,,medium,confirmed,2026-10-02T00:00:00Z,Misconfiguration detected; no CVE assigned yet
+F-010,A-007,SYN-007,critical,not_affected,2026-10-09T00:00:00Z,Vendor confirmed not_affected; retain for analyst validation
+F-011,A-008,SYN-008,unknown,confirmed,2026-10-11T00:00:00Z,Severity undetermined pending vendor response
+F-012,A-009,SYN-009,high,confirmed,2026-10-13T00:00:00Z,Finding on asset with unknown context
+F-013,A-010,SYN-010,low,confirmed,2026-10-14T00:00:00Z,Low severity on internal non-exposed host
+F-014,A-011,SYN-004,critical,confirmed,2026-10-15T00:00:00Z,SQL injection on legacy exposed gateway
+F-015,A-012,SYN-011,medium,unconfirmed,2026-10-16T00:00:00Z,XSS in wiki editor; applicability unconfirmed
+F-016,UNMATCHED-999,SYN-012,high,confirmed,2026-10-17T00:00:00Z,Finding references asset not in assets file
