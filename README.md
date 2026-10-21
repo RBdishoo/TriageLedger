@@ -98,15 +98,15 @@ policies/demo-policy-v1.json ─────────────────
 
 ## Output artifacts
 
-All six artifacts are written atomically (staged in a temp sibling, renamed on success).
+All artifacts are staged in a temporary sibling directory and published by rename on success. This applies to both the six-artifact successful path and the diagnostics-only fatal path. The rename reduces the chance of partial writes reaching the destination but is not crash-safe or concurrency-safe.
 
 | File | Contents |
 |---|---|
 | `decisions.json` | Canonical structured decisions with provenance and run identity |
-| `queue.csv` | Spreadsheet-friendly priority queue for all actionable findings |
+| `queue.csv` | Spreadsheet-friendly queue for all decisions, including excluded (not\_affected) findings |
 | `review.csv` | Subset of flagged decisions requiring data or analyst investigation |
 | `briefing.md` | Top actions by priority, uncertainty flag counts, stated limitations |
-| `diagnostics.json` | Row-level parse errors, duplicate counts, reconciliation summary |
+| `diagnostics.json` | Row-level parse errors, duplicate counts, reconciliation summary, policy validation failures |
 | `manifest.json` | Schema/policy/tool versions, input hashes, row counts, artifact hashes |
 
 Exit codes: 0 = complete, no flags; 1 = operational failure; 2 = bad inputs or policy;
@@ -145,7 +145,7 @@ specified. They do not validate real-world prioritization effectiveness.
 - Strict CSV parsing with per-row diagnostics and duplicate normalization
 - Versioned policy evaluation (EX-01, P-01 through P-07) with first-match semantics
 - Explicit uncertainty flags for stale context, missing assets, unknown severity, conflicting evidence
-- Deterministic artifacts: same inputs + policy + as-of always produce byte-identical output
+- Deterministic artifacts: same inputs + policy + as-of + tool version + absolute input paths produce byte-identical output
 - CSV formula injection mitigation and Markdown injection escaping
 - Atomic staged output; no partial writes reach the destination on failure
 

@@ -47,8 +47,12 @@ _REQUIRED_POLICY_KEYS = frozenset(
 )
 
 
-def load_policy(path: Path) -> PolicyConfig:
+def load_policy(path: Path, raw_bytes: bytes | None = None) -> PolicyConfig:
     """Load and validate a policy JSON file. Raises ValueError on any failure.
+
+    If raw_bytes is provided it is decoded and used as the file content; the
+    file is not re-read. This ensures the same snapshot is used for policy
+    loading and for provenance hashing in the caller.
 
     Validation rules:
     - Must be a JSON object with exactly the required keys (no unknown keys).
@@ -56,10 +60,16 @@ def load_policy(path: Path) -> PolicyConfig:
     - context_freshness_days and evidence_freshness_days must be positive integers (not booleans).
     - rules must be exactly REQUIRED_RULE_SEQUENCE in order.
     """
-    try:
-        raw = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise ValueError(f"Cannot read policy file {path}: {exc}") from exc
+    if raw_bytes is not None:
+        try:
+            raw = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Cannot decode policy file {path}: {exc}") from exc
+    else:
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValueError(f"Cannot read policy file {path}: {exc}") from exc
 
     try:
         data: Any = json.loads(raw)
@@ -94,16 +104,14 @@ def load_policy(path: Path) -> PolicyConfig:
         if isinstance(val, bool):  # bool subclasses int; reject it explicitly
             raise ValueError(f"{key} must be a positive integer, not a boolean")
         if not isinstance(val, int) or val <= 0:
-            raise ValueError(f"{key} must be a positive integer, got {val!r}")
+            raise ValueError(f"{key} must be a positive integer")
 
     rules = data["rules"]
     if not isinstance(rules, list):
         raise ValueError("rules must be a JSON array")
 
     if tuple(rules) != REQUIRED_RULE_SEQUENCE:
-        raise ValueError(
-            f"rules must be exactly {list(REQUIRED_RULE_SEQUENCE)} in order; got {rules}"
-        )
+        raise ValueError(f"rules must be exactly {list(REQUIRED_RULE_SEQUENCE)} in order")
 
     return PolicyConfig(
         policy_id=policy_id,

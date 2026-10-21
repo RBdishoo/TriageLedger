@@ -195,7 +195,7 @@ def test_parse_assets_duplicate_header_fatal(tmp_path: Path) -> None:
     )
     result = parse_assets(p, AS_OF)
     assert result.fatal
-    assert any("duplicate column" in d.message for d in result.diagnostics)
+    assert any("duplicate column headers" in d.message for d in result.diagnostics)
 
 
 def test_parse_assets_nul_bytes_fatal(tmp_path: Path) -> None:
@@ -735,3 +735,380 @@ def test_reconciliation_fatal_conflicting_id(tmp_path: Path) -> None:
     assert result.assets == []
     # total_rows_read counts rows the loop touched before failing (2 here)
     assert result.total_rows_read == 2
+
+
+# ---------------------------------------------------------------------------
+# Snapshot consistency: pre-captured bytes used instead of re-reading
+# ---------------------------------------------------------------------------
+
+
+def test_parse_assets_pre_captured_bytes_used(tmp_path: Path) -> None:
+    """When raw_bytes is provided, parse_assets uses those bytes and does not re-read the file.
+
+    This verifies the parsing and hashing snapshots cannot diverge: the same bytes
+    passed for provenance hashing are the bytes actually parsed.
+    """
+    content = (
+        "asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        "A-001,Alpha,critical,exposed,ops,2026-10-01T00:00:00Z\n"
+    )
+    p = tmp_path / "assets.csv"
+    p.write_text(content, encoding="utf-8")
+    raw_bytes = p.read_bytes()
+
+    # Overwrite the file on disk with different content.
+    p.write_text(
+        "asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        "A-999,Modified,standard,not_exposed,,2026-10-01T00:00:00Z\n",
+        encoding="utf-8",
+    )
+
+    # parse_assets must use the pre-captured bytes, not the overwritten file.
+    result = parse_assets(p, AS_OF, raw_bytes)
+    assert not result.fatal
+    assert result.accepted == 1
+    assert result.assets[0].asset_id == "A-001"  # from pre-captured bytes, not A-999
+
+
+def test_parse_findings_pre_captured_bytes_used(tmp_path: Path) -> None:
+    """parse_findings uses pre-captured bytes when provided."""
+    content = (
+        "finding_id,asset_id,vulnerability_id,severity,applicability,detected_at,description\n"
+        "F-001,A-001,SYN-001,high,confirmed,2026-10-05T00:00:00Z,original\n"
+    )
+    p = tmp_path / "findings.csv"
+    p.write_text(content, encoding="utf-8")
+    raw_bytes = p.read_bytes()
+
+    p.write_text(
+        "finding_id,asset_id,vulnerability_id,severity,applicability,detected_at,description\n"
+        "F-999,A-999,SYN-999,low,unconfirmed,2026-10-05T00:00:00Z,modified\n",
+        encoding="utf-8",
+    )
+
+    result = parse_findings(p, AS_OF, raw_bytes)
+    assert not result.fatal
+    assert result.findings[0].finding_id == "F-001"  # from pre-captured bytes
+
+
+def test_parse_threat_evidence_pre_captured_bytes_used(tmp_path: Path) -> None:
+    """parse_threat_evidence uses pre-captured bytes when provided."""
+    content = (
+        "evidence_id,vulnerability_id,exploitation_status,source_label,source_reference,observed_at\n"
+        "E-001,SYN-001,active,Synthetic A,synthetic://a,2026-10-17T00:00:00Z\n"
+    )
+    p = tmp_path / "evidence.csv"
+    p.write_text(content, encoding="utf-8")
+    raw_bytes = p.read_bytes()
+
+    p.write_text(
+        "evidence_id,vulnerability_id,exploitation_status,source_label,source_reference,observed_at\n"
+        "E-999,SYN-999,not_observed,Modified,synthetic://b,2026-10-17T00:00:00Z\n",
+        encoding="utf-8",
+    )
+
+    result = parse_threat_evidence(p, AS_OF, raw_bytes)
+    assert not result.fatal
+    assert result.threat_evidence[0].evidence_id == "E-001"  # from pre-captured bytes
+
+
+# ---------------------------------------------------------------------------
+# Schema selection: explicit per-parser, not derived from filename
+# ---------------------------------------------------------------------------
+
+
+def test_parse_assets_arbitrary_filename_accepted(tmp_path: Path) -> None:
+    """parse_assets uses ASSET_COLUMNS regardless of the filename."""
+    p = write(
+        tmp_path,
+        "mydata.csv",  # not named "assets*.csv"
+        """\
+        asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at
+        A-001,Alpha,critical,exposed,ops,2026-10-01T00:00:00Z
+        """,
+    )
+    result = parse_assets(p, AS_OF)
+    assert not result.fatal
+    assert result.accepted == 1
+
+
+def test_parse_findings_arbitrary_filename_accepted(tmp_path: Path) -> None:
+    """parse_findings uses FINDING_COLUMNS regardless of the filename."""
+    p = write(
+        tmp_path,
+        "export_20261019.csv",  # arbitrary name
+        """\
+        finding_id,asset_id,vulnerability_id,severity,applicability,detected_at,description
+        F-001,A-001,SYN-001,high,confirmed,2026-10-05T00:00:00Z,RCE
+        """,
+    )
+    result = parse_findings(p, AS_OF)
+    assert not result.fatal
+    assert result.accepted == 1
+
+
+def test_parse_threat_evidence_arbitrary_filename_accepted(tmp_path: Path) -> None:
+    """parse_threat_evidence uses EVIDENCE_COLUMNS regardless of the filename."""
+    p = write(
+        tmp_path,
+        "intel_feed.csv",  # arbitrary name
+        """\
+        evidence_id,vulnerability_id,exploitation_status,source_label,source_reference,observed_at
+        E-001,SYN-001,active,Source A,synthetic://a,2026-10-17T00:00:00Z
+        """,
+    )
+    result = parse_threat_evidence(p, AS_OF)
+    assert not result.fatal
+    assert result.accepted == 1
+
+
+# ---------------------------------------------------------------------------
+# Bounded read: oversized files are rejected without reading full content
+# ---------------------------------------------------------------------------
+
+
+def test_bounded_read_rejects_oversized_file(tmp_path: Path, monkeypatch) -> None:
+    """A file larger than MAX_FILE_BYTES is rejected; full content need not be loaded."""
+    small_limit = 100
+    monkeypatch.setattr("triageledger.ingest.MAX_FILE_BYTES", small_limit)
+
+    p = tmp_path / "assets.csv"
+    p.write_bytes(b"x" * (small_limit + 500))  # well over the monkeypatched limit
+    result = parse_assets(p, AS_OF)
+    assert result.fatal
+    assert any("exceeds limit" in d.message for d in result.diagnostics)
+    assert result.total_rows_read == 0
+
+
+# ---------------------------------------------------------------------------
+# CSV strict quoting: malformed rows produce a fatal structured diagnostic
+# ---------------------------------------------------------------------------
+
+
+def test_parse_assets_csv_error_during_iteration_fatal(tmp_path: Path) -> None:
+    """Malformed CSV quoting during data row iteration is caught as a fatal diagnostic.
+
+    With strict quoting enabled, a field with content after the closing quote
+    (before the delimiter) raises csv.Error immediately rather than silently
+    producing wrong field values.
+    """
+    # "A-001"X is invalid: the 'X' follows the closing quote before the comma.
+    # strict=True causes csv.Error on this row.
+    content = (
+        "asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        '"A-001"X,Alpha,critical,exposed,ops,2026-10-01T00:00:00Z\n'
+    )
+    p = tmp_path / "assets.csv"
+    p.write_bytes(content.encode("utf-8"))
+    result = parse_assets(p, AS_OF)
+    assert result.fatal
+    assert result.assets == []
+    assert result.accepted == 0
+    assert any("CSV" in d.message or "parse" in d.message.lower() for d in result.diagnostics), (
+        f"Expected a CSV parse error diagnostic; got: {[d.message for d in result.diagnostics]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Diagnostic redaction: raw field values must not appear in messages
+# ---------------------------------------------------------------------------
+
+
+def test_diagnostic_messages_do_not_embed_raw_enum_value(tmp_path: Path) -> None:
+    """An invalid enum value must not appear in diagnostic messages.
+
+    Embedding raw field values in messages risks exposing untrusted input data
+    in logs, stderr, and structured diagnostics output.
+    """
+    sentinel = "SNSV_MARKER_REDACTION_TEST_XYZ"
+    p = write(
+        tmp_path,
+        "assets.csv",
+        f"asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        f"A-001,Display Name,{sentinel},exposed,ops,2026-10-01T00:00:00Z\n",
+    )
+    result = parse_assets(p, AS_OF)
+    assert result.fatal
+    for d in result.diagnostics:
+        assert sentinel not in d.message, (
+            f"Sentinel value found in diagnostic message: {d.message!r}"
+        )
+
+
+def test_diagnostic_messages_do_not_embed_raw_timestamp_value(tmp_path: Path) -> None:
+    """An invalid timestamp value must not appear in diagnostic messages."""
+    sentinel = "SNSV_MARKER_TS_TEST_XYZ"
+    p = write(
+        tmp_path,
+        "assets.csv",
+        f"asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        f"A-001,Display Name,critical,exposed,ops,{sentinel}\n",
+    )
+    result = parse_assets(p, AS_OF)
+    assert result.fatal
+    for d in result.diagnostics:
+        assert sentinel not in d.message, (
+            f"Sentinel value found in diagnostic message: {d.message!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Diagnostic redaction: additional leakage paths
+# ---------------------------------------------------------------------------
+
+
+def test_conflicting_duplicate_id_not_in_message(tmp_path: Path) -> None:
+    """Conflicting duplicate message must not embed the duplicated ID value."""
+    sentinel = "SNSV_MARKER_CONFLICT_XYZ"
+    p = write(
+        tmp_path,
+        "assets.csv",
+        f"asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        f"{sentinel},Alpha,critical,exposed,ops,2026-10-01T00:00:00Z\n"
+        f"{sentinel},DIFFERENT,standard,not_exposed,,2026-10-02T00:00:00Z\n",
+    )
+    result = parse_assets(p, AS_OF)
+    assert result.fatal
+    for d in result.diagnostics:
+        assert sentinel not in d.message, (
+            f"Sentinel found in conflicting-duplicate message: {d.message!r}"
+        )
+
+
+def test_identical_duplicate_id_not_in_message(tmp_path: Path) -> None:
+    """Identical duplicate (collapsed) message must not embed the ID value."""
+    sentinel = "SNSV_MARKER_IDDUP_XYZ"
+    p = write(
+        tmp_path,
+        "assets.csv",
+        f"asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        f"{sentinel},Alpha,critical,exposed,ops,2026-10-01T00:00:00Z\n"
+        f"{sentinel},Alpha,critical,exposed,ops,2026-10-01T00:00:00Z\n",
+    )
+    result = parse_assets(p, AS_OF)
+    assert not result.fatal
+    for d in result.diagnostics:
+        assert sentinel not in d.message, (
+            f"Sentinel found in identical-duplicate message: {d.message!r}"
+        )
+
+
+def test_possible_duplicate_ids_not_in_message(tmp_path: Path) -> None:
+    """Possible-duplicate message must not embed asset_id, vulnerability_id, or finding_id."""
+    sentinel = "SNSV_MARKER_POSDUP_XYZ"
+    p = write(
+        tmp_path,
+        "findings.csv",
+        f"finding_id,asset_id,vulnerability_id,severity,applicability,detected_at,description\n"
+        f"F-{sentinel}-1,A-001,SYN-{sentinel},high,confirmed,2026-10-05T00:00:00Z,first\n"
+        f"F-{sentinel}-2,A-001,SYN-{sentinel},high,confirmed,2026-10-06T00:00:00Z,second\n",
+    )
+    result = parse_findings(p, AS_OF)
+    assert not result.fatal
+    for d in result.diagnostics:
+        assert sentinel not in d.message, (
+            f"Sentinel found in possible-duplicate message: {d.message!r}"
+        )
+
+
+def test_unicode_decode_error_no_exc_detail_in_message(tmp_path: Path) -> None:
+    """UnicodeDecodeError must produce a fixed message; Python exception detail must be absent."""
+    p = tmp_path / "assets.csv"
+    cols = (
+        b"asset_id,display_name,business_criticality,"
+        b"internet_exposure,owner_team,context_updated_at\n"
+    )
+    p.write_bytes(cols + b"\xff\xfe invalid utf-8\n")
+    result = parse_assets(p, AS_OF)
+    assert result.fatal
+    messages = [d.message for d in result.diagnostics]
+    assert any("UTF-8" in m for m in messages), f"Expected UTF-8 error; got: {messages}"
+    for d in result.diagnostics:
+        assert "codec" not in d.message.lower(), (
+            f"Python exception detail leaked into message: {d.message!r}"
+        )
+
+
+def test_csv_error_no_exc_detail_in_message(tmp_path: Path) -> None:
+    """csv.Error during iteration must produce a fixed message; exception detail must be absent."""
+    content = (
+        "asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        '"A-001"INVALID,Alpha,critical,exposed,ops,2026-10-01T00:00:00Z\n'
+    )
+    p = tmp_path / "assets.csv"
+    p.write_bytes(content.encode("utf-8"))
+    result = parse_assets(p, AS_OF)
+    assert result.fatal
+    assert result.assets == []
+    for d in result.diagnostics:
+        # Python csv module messages include phrases like "expected '\\n' after ...".
+        # These must not appear verbatim.
+        assert "expected" not in d.message, f"csv.Error detail may have leaked: {d.message!r}"
+
+
+def test_unexpected_column_name_not_in_message(tmp_path: Path) -> None:
+    """Unexpected column names must not appear in the diagnostic message."""
+    sentinel = "SNSV_MARKER_XCOL_XYZ"
+    p = write(
+        tmp_path,
+        "assets.csv",
+        f"asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at,{sentinel}\n"
+        f"A-001,Alpha,critical,exposed,ops,2026-10-01T00:00:00Z,oops\n",
+    )
+    result = parse_assets(p, AS_OF)
+    assert result.fatal
+    for d in result.diagnostics:
+        assert sentinel not in d.message, (
+            f"Sentinel found in unexpected-column message: {d.message!r}"
+        )
+
+
+def test_duplicate_header_name_not_in_message(tmp_path: Path) -> None:
+    """Duplicate header names must not appear in the diagnostic message."""
+    sentinel = "SNSV_MARKER_DHDR_XYZ"
+    p = write(
+        tmp_path,
+        "assets.csv",
+        f"asset_id,{sentinel},{sentinel},internet_exposure,owner_team,context_updated_at\n"
+        f"A-001,Alpha,critical,exposed,ops,2026-10-01T00:00:00Z\n",
+    )
+    result = parse_assets(p, AS_OF)
+    assert result.fatal
+    for d in result.diagnostics:
+        assert sentinel not in d.message, (
+            f"Sentinel found in duplicate-header message: {d.message!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Oversized supplied snapshots rejected; empty snapshot treated as empty CSV
+# ---------------------------------------------------------------------------
+
+
+def test_parse_assets_oversized_supplied_bytes_fatal(tmp_path: Path, monkeypatch) -> None:
+    """A raw_bytes argument larger than MAX_FILE_BYTES is rejected without re-reading the file."""
+    small_limit = 50
+    monkeypatch.setattr("triageledger.ingest.MAX_FILE_BYTES", small_limit)
+    p = tmp_path / "assets.csv"
+    p.write_bytes(b"whatever")
+    oversized = b"x" * (small_limit + 1)
+    result = parse_assets(p, AS_OF, oversized)
+    assert result.fatal
+    assert any("exceeds limit" in d.message for d in result.diagnostics)
+
+
+def test_parse_assets_empty_supplied_bytes_fatal_missing_columns(tmp_path: Path) -> None:
+    """b'' as raw_bytes is treated as an empty snapshot (not a trigger to re-read the file).
+
+    An empty snapshot has no header, so validation fails with missing required columns.
+    """
+    p = tmp_path / "assets.csv"
+    p.write_text(
+        "asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        "A-001,Alpha,critical,exposed,ops,2026-10-01T00:00:00Z\n",
+        encoding="utf-8",
+    )
+    result = parse_assets(p, AS_OF, b"")
+    assert result.fatal
+    assert any("missing required columns" in d.message for d in result.diagnostics)
+    assert result.accepted == 0

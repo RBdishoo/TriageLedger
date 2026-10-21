@@ -15,12 +15,14 @@ frozenset/set iteration order does not affect artifact bytes.
 
 from __future__ import annotations
 
+import argparse
 import csv
 import hashlib
 import json
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -609,3 +611,264 @@ class TestByteIdenticalReplay:
         )
         assert r.returncode == 3, f"Demo command exited {r.returncode}; stderr: {r.stderr}"
         assert (out / "decisions.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# Policy-only failure: structured diagnostics and staged publication
+# ---------------------------------------------------------------------------
+
+
+class TestPolicyFailureDiagnostics:
+    def test_policy_error_in_diagnostics_json(self, tmp_path: Path) -> None:
+        """A bad policy must produce diagnostics.json that records the policy failure."""
+        bad_policy = tmp_path / "bad_policy.json"
+        bad_policy.write_text('{"policy_id": "x"}', encoding="utf-8")
+        out = tmp_path / "out"
+
+        r = _run(
+            [
+                "evaluate",
+                "--assets",
+                str(_SAMPLES / "assets.csv"),
+                "--findings",
+                str(_SAMPLES / "findings.csv"),
+                "--threat-evidence",
+                str(_SAMPLES / "threat_evidence.csv"),
+                "--policy",
+                str(bad_policy),
+                "--as-of",
+                _AS_OF,
+                "--output-dir",
+                str(out),
+            ]
+        )
+
+        assert r.returncode == 2
+        assert (out / "diagnostics.json").exists()
+
+        doc = json.loads((out / "diagnostics.json").read_text(encoding="utf-8"))
+        all_messages = [
+            d["message"] for file_entry in doc["files"] for d in file_entry["diagnostics"]
+        ]
+        assert any(all_messages), "diagnostics.json must contain at least one message"
+        assert any("missing" in m.lower() or "key" in m.lower() for m in all_messages), (
+            f"Expected a policy key error in diagnostics; got: {all_messages}"
+        )
+
+    def test_fatal_diagnostics_published_atomically(self, tmp_path: Path) -> None:
+        """Fatal ingestion must publish diagnostics.json to dest with no temp residue."""
+        bad_findings = tmp_path / "bad.csv"
+        bad_findings.write_text(
+            "finding_id,asset_id,vulnerability_id,severity,applicability,detected_at,description\n"
+            "F-BAD,A-001,SYN-001,INVALID_SEVERITY,confirmed,2026-10-01T00:00:00Z,\n",
+            encoding="utf-8",
+        )
+        out = tmp_path / "out"
+        r = _run(
+            [
+                "evaluate",
+                "--assets",
+                str(_SAMPLES / "assets.csv"),
+                "--findings",
+                str(bad_findings),
+                "--threat-evidence",
+                str(_SAMPLES / "threat_evidence.csv"),
+                "--policy",
+                str(_POLICY),
+                "--as-of",
+                _AS_OF,
+                "--output-dir",
+                str(out),
+            ]
+        )
+
+        assert r.returncode == 2
+        # diagnostics.json at the destination (publication succeeded)
+        assert (out / "diagnostics.json").exists()
+        # No orphaned temp directories under tmp_path
+        temp_dirs = [p for p in tmp_path.iterdir() if "_tmp_" in p.name]
+        assert not temp_dirs, f"Unexpected temp directories: {temp_dirs}"
+
+    def test_diagnostic_redaction_no_raw_value_in_stderr(self, tmp_path: Path) -> None:
+        """Raw field values from invalid input must not appear in stderr."""
+        sentinel = "SNSV_MARKER_STDERR_TEST_XYZ"
+        bad_findings = tmp_path / "bad.csv"
+        bad_findings.write_text(
+            "finding_id,asset_id,vulnerability_id,severity,applicability,detected_at,description\n"
+            f"F-BAD,A-001,SYN-001,{sentinel},confirmed,2026-10-01T00:00:00Z,\n",
+            encoding="utf-8",
+        )
+        out = tmp_path / "out"
+        r = _run(
+            [
+                "evaluate",
+                "--assets",
+                str(_SAMPLES / "assets.csv"),
+                "--findings",
+                str(bad_findings),
+                "--threat-evidence",
+                str(_SAMPLES / "threat_evidence.csv"),
+                "--policy",
+                str(_POLICY),
+                "--as-of",
+                _AS_OF,
+                "--output-dir",
+                str(out),
+            ]
+        )
+
+        assert r.returncode == 2
+        assert sentinel not in r.stderr, f"Sentinel value found in stderr: {r.stderr!r}"
+        # Also verify it is not in the diagnostics file
+        if (out / "diagnostics.json").exists():
+            diag_text = (out / "diagnostics.json").read_text(encoding="utf-8")
+            assert sentinel not in diag_text, "Sentinel value found in diagnostics.json"
+
+
+# ---------------------------------------------------------------------------
+# In-process partial-write failure tests
+# ---------------------------------------------------------------------------
+
+_AS_OF_DT = datetime(2026, 10, 19, 0, 0, 0, tzinfo=UTC)
+
+
+def _make_minimal_inputs(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+    """Write minimal valid CSV and policy files; return (assets, findings, evidence, policy)."""
+    assets = tmp_path / "assets.csv"
+    assets.write_text(
+        "asset_id,display_name,business_criticality,internet_exposure,owner_team,context_updated_at\n"
+        "CLEAN-A1,Clean Asset,standard,not_exposed,clean-team,2026-10-19T00:00:00Z\n",
+        encoding="utf-8",
+    )
+    findings = tmp_path / "findings.csv"
+    findings.write_text(
+        "finding_id,asset_id,vulnerability_id,severity,applicability,detected_at,description\n"
+        "CLEAN-F1,CLEAN-A1,CLEAN-V1,low,confirmed,2026-10-18T00:00:00Z,\n",
+        encoding="utf-8",
+    )
+    evidence = tmp_path / "evidence.csv"
+    evidence.write_text(
+        "evidence_id,vulnerability_id,exploitation_status,source_label,source_reference,observed_at\n"
+        "CLEAN-E1,CLEAN-V1,not_observed,clean-source,synthetic://clean/CLEAN-V1,2026-10-19T00:00:00Z\n",
+        encoding="utf-8",
+    )
+    policy = tmp_path / "policy.json"
+    policy.write_text(
+        json.dumps(
+            {
+                "policy_id": "test-policy",
+                "version": "0.1.0",
+                "description": "Minimal test policy",
+                "context_freshness_days": 30,
+                "evidence_freshness_days": 7,
+                "rules": ["EX-01", "P-01", "P-02", "P-03", "P-04", "P-05", "P-06", "P-07"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return assets, findings, evidence, policy
+
+
+def _make_args(
+    assets: Path,
+    findings: Path,
+    evidence: Path,
+    policy: Path,
+    output_dir: Path,
+) -> argparse.Namespace:
+    return argparse.Namespace(
+        assets=str(assets),
+        findings=str(findings),
+        threat_evidence=str(evidence),
+        policy=str(policy),
+        as_of=_AS_OF_DT,
+        output_dir=str(output_dir),
+        overwrite=False,
+    )
+
+
+class TestPartialWriteFailure:
+    """In-process tests for OSError failures during artifact staging.
+
+    These tests call _run_evaluate directly with monkeypatched writer functions
+    to verify staging cleanup and destination safety without OS-level permissions.
+    """
+
+    def test_artifact_write_failure_exit1_no_dest_staging_cleaned(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """OSError raised by write_queue_csv: exit 1, dest not created, staging cleaned up.
+
+        write_decisions_json is allowed to succeed (earlier artifact in tmp),
+        then write_queue_csv raises before the rename. Verifies:
+        - exit code 1
+        - dest does not exist (rename never happened)
+        - no temp staging directories remain
+        - an unrelated pre-existing output directory is untouched
+        """
+        import triageledger.cli as cli_mod
+        from triageledger.cli import _run_evaluate
+
+        assets, findings, evidence, policy = _make_minimal_inputs(tmp_path)
+        dest = tmp_path / "run_output"
+
+        # Pre-existing unrelated output that must be untouched.
+        unrelated = tmp_path / "unrelated_run"
+        unrelated.mkdir()
+        sentinel_file = unrelated / "sentinel.txt"
+        sentinel_file.write_text("must not change", encoding="utf-8")
+
+        def failing_write_queue(decisions, path):
+            path.write_bytes(b"partial content written before failure")
+            raise OSError("simulated disk failure in write_queue_csv")
+
+        monkeypatch.setattr(cli_mod, "write_queue_csv", failing_write_queue)
+
+        args = _make_args(assets, findings, evidence, policy, dest)
+        rc = _run_evaluate(args)
+
+        assert rc == 1, f"Expected exit 1, got {rc}"
+        assert not dest.exists(), "dest must not be created when staging fails"
+        # Staging temp dir must be cleaned up.
+        temp_dirs = [p for p in tmp_path.iterdir() if "_tmp_" in p.name]
+        assert not temp_dirs, f"Staging temp dirs not cleaned up: {temp_dirs}"
+        # Unrelated output must be unchanged.
+        assert sentinel_file.read_text(encoding="utf-8") == "must not change"
+
+    def test_diagnostic_write_failure_on_fatal_path_exit1_no_dest(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """OSError raised by write_diagnostics_json on the fatal path: exit 1, dest not created.
+
+        Provides invalid findings (bad severity) to trigger the fatal ingestion path,
+        then injects a failure in write_diagnostics_json. Verifies:
+        - exit code 1
+        - dest does not exist (rename never happened)
+        - no temp staging directories remain
+        """
+        import triageledger.cli as cli_mod
+        from triageledger.cli import _run_evaluate
+
+        assets, _, evidence, policy = _make_minimal_inputs(tmp_path)
+
+        bad_findings = tmp_path / "bad_findings.csv"
+        bad_findings.write_text(
+            "finding_id,asset_id,vulnerability_id,severity,applicability,detected_at,description\n"
+            "F-BAD,CLEAN-A1,SYN-001,INVALID_SEVERITY,confirmed,2026-10-01T00:00:00Z,\n",
+            encoding="utf-8",
+        )
+        dest = tmp_path / "fatal_output"
+
+        def failing_write_diagnostics(ingest_results, run_id, as_of, path):
+            path.write_bytes(b"partial diag content")
+            raise OSError("simulated disk failure in write_diagnostics_json")
+
+        monkeypatch.setattr(cli_mod, "write_diagnostics_json", failing_write_diagnostics)
+
+        args = _make_args(assets, bad_findings, evidence, policy, dest)
+        rc = _run_evaluate(args)
+
+        assert rc == 1, f"Expected exit 1, got {rc}"
+        assert not dest.exists(), "dest must not be created when diagnostics write fails"
+        temp_dirs = [p for p in tmp_path.iterdir() if "_tmp_" in p.name]
+        assert not temp_dirs, f"Staging temp dirs not cleaned up: {temp_dirs}"

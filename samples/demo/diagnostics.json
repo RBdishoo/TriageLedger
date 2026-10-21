@@ -22,7 +22,7 @@
           "source_file": "samples/findings.csv",
           "row_number": 8,
           "field_name": "finding_id",
-          "message": "possible_duplicate: asset_id 'A-005' + vulnerability_id 'SYN-001' also appears in finding_id 'F-006'"
+          "message": "possible_duplicate: (asset_id, vulnerability_id) pair in an earlier finding"
         }
       ]
     },
@@ -30,6 +30,14 @@
       "source_file": "samples/threat_evidence.csv",
       "total_rows_read": 9,
       "accepted": 9,
+      "collapsed_duplicates": 0,
+      "fatal": false,
+      "diagnostics": []
+    },
+    {
+      "source_file": "policies/demo-policy-v1.json",
+      "total_rows_read": 0,
+      "accepted": 0,
       "collapsed_duplicates": 0,
       "fatal": false,
       "diagnostics": []

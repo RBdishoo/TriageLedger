@@ -95,30 +95,35 @@ def _parse_utc_timestamp(
 
     Returns (datetime, None) on success, (None, error_message) on failure.
     Rejects timestamps after as_of when as_of is provided.
+    Error messages do not embed the raw value to avoid exposing untrusted data.
     """
     raw = raw.strip()
     if not raw:
         return None, "timestamp is blank"
     if not raw.endswith("Z"):
-        return None, f"timestamp must end with Z (UTC), got: {raw!r}"
+        return None, "timestamp must end with Z (UTC)"
     try:
         dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
-        return None, f"invalid ISO-8601 timestamp: {raw!r}"
+        return None, "invalid ISO-8601 timestamp"
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     if as_of is not None and dt > as_of:
-        return None, f"timestamp {raw!r} is after as-of {as_of.isoformat()}"
+        return None, f"timestamp is after as-of {as_of.isoformat()}"
     return dt, None
 
 
 def _parse_enum(raw: str, enum_cls: type, field_name: str) -> tuple[object | None, str | None]:
+    """Parse a string value as a member of enum_cls.
+
+    Error messages do not embed the raw value to avoid exposing untrusted data.
+    """
     value = _trim_id(raw)
     try:
         return enum_cls(value), None
     except ValueError:
         allowed = ", ".join(e.value for e in enum_cls)
-        return None, f"{field_name} {value!r} is not one of: {allowed}"
+        return None, f"{field_name}: value not in allowed set ({allowed})"
 
 
 def _validate_headers(
@@ -137,7 +142,7 @@ def _validate_headers(
             "fatal",
             None,
             None,
-            f"duplicate column headers: {duplicates}",
+            "duplicate column headers present",
         )
         result.fatal = True
         return False
@@ -159,36 +164,77 @@ def _validate_headers(
             "fatal",
             None,
             None,
-            f"unexpected columns (schema v1 rejects unknown columns): {sorted(unexpected)}",
+            "unexpected columns present (schema v1 rejects unknown columns)",
         )
         result.fatal = True
         return False
     return True
 
 
-def _read_raw_csv(path: Path, result: IngestResult) -> list[dict[str, str]] | None:
-    """Read and decode the file, check size limits, return list of row dicts or None on fatal."""
+def _read_bounded_bytes(path: Path, result: IngestResult) -> bytes | None:
+    """Read at most MAX_FILE_BYTES bytes; reject files that exceed the limit.
+
+    Reads MAX_FILE_BYTES + 1 bytes from the file to detect oversized files
+    without loading their full content into memory. Returns None and sets
+    result.fatal on any failure.
+    """
     try:
-        raw_bytes = path.read_bytes()
+        with path.open("rb") as f:
+            data = f.read(MAX_FILE_BYTES + 1)
     except OSError as exc:
         result.add_diagnostic("fatal", None, None, f"cannot read file: {exc}")
         result.fatal = True
         return None
 
+    if len(data) > MAX_FILE_BYTES:
+        result.add_diagnostic(
+            "fatal",
+            None,
+            None,
+            f"file size exceeds limit {MAX_FILE_BYTES} bytes",
+        )
+        result.fatal = True
+        return None
+
+    return data
+
+
+def _read_raw_csv(
+    raw_bytes: bytes,
+    result: IngestResult,
+    expected_cols: frozenset[str],
+) -> list[dict[str, str]] | None:
+    """Decode and parse a bounded byte snapshot as CSV.
+
+    The caller is responsible for providing bounded bytes (via _read_bounded_bytes
+    or pre-captured from the same snapshot used for hashing). Oversized snapshots
+    supplied directly are also rejected here as a defensive check.
+
+    Uses strict quoting mode: malformed quoting raises csv.Error immediately
+    rather than silently producing incorrect field values.
+
+    Error messages do not embed raw field values or CSV library exception details
+    to avoid exposing untrusted data in diagnostics and stderr output.
+    Source file paths recorded in IngestResult.source_file are an intentional
+    exception — they are operator-supplied paths, not row-level content.
+
+    Returns a list of row dicts on success; None on any fatal error.
+    """
+    # Defensive size check for directly supplied snapshots.
     if len(raw_bytes) > MAX_FILE_BYTES:
         result.add_diagnostic(
             "fatal",
             None,
             None,
-            f"file size {len(raw_bytes)} bytes exceeds limit {MAX_FILE_BYTES} bytes",
+            f"file size exceeds limit {MAX_FILE_BYTES} bytes",
         )
         result.fatal = True
         return None
 
     try:
         text = raw_bytes.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        result.add_diagnostic("fatal", None, None, f"file is not valid UTF-8: {exc}")
+    except UnicodeDecodeError:
+        result.add_diagnostic("fatal", None, None, "file is not valid UTF-8")
         result.fatal = True
         return None
 
@@ -199,25 +245,45 @@ def _read_raw_csv(path: Path, result: IngestResult) -> list[dict[str, str]] | No
 
     # restval=None (default) means absent fields are None — distinguishable from present-but-empty.
     # restkey=None (default) means extra fields accumulate under key None.
-    reader = csv.DictReader(io.StringIO(text))
+    # strict=True: raise csv.Error immediately on malformed quoting rather than guessing.
+    reader = csv.DictReader(io.StringIO(text), strict=True)
     try:
         fieldnames = reader.fieldnames or []
-    except csv.Error as exc:
-        result.add_diagnostic("fatal", None, None, f"CSV parse error on header: {exc}")
+    except csv.Error:
+        result.add_diagnostic("fatal", None, None, "CSV header parse error")
         result.fatal = True
         return None
 
-    if not _validate_headers(list(fieldnames), _expected_columns(path.name), result):
+    if not _validate_headers(list(fieldnames), expected_cols, result):
         return None
 
     expected_width = len(fieldnames)
     rows: list[dict[str, str]] = []
-    for i, row in enumerate(reader, start=2):  # row 1 = header
+
+    # Iterate explicitly so csv.Error raised during row parsing is caught and
+    # recorded as a structured diagnostic rather than propagating as an exception.
+    row_iter = iter(reader)
+    row_number = 2  # row 1 = header
+    while True:
+        try:
+            row = next(row_iter)
+        except StopIteration:
+            break
+        except csv.Error:
+            result.add_diagnostic(
+                "fatal",
+                row_number,
+                None,
+                "CSV parse error in data row",
+            )
+            result.fatal = True
+            return None
+
         result.total_rows_read += 1
         if result.total_rows_read > MAX_DATA_ROWS:
             result.add_diagnostic(
                 "fatal",
-                i,
+                row_number,
                 None,
                 f"data row count exceeds limit {MAX_DATA_ROWS}",
             )
@@ -228,7 +294,7 @@ def _read_raw_csv(path: Path, result: IngestResult) -> list[dict[str, str]] | No
         if row.get(None) is not None:  # type: ignore[call-overload]
             result.add_diagnostic(
                 "fatal",
-                i,
+                row_number,
                 None,
                 f"row has more fields than the {expected_width}-column header",
             )
@@ -240,7 +306,7 @@ def _read_raw_csv(path: Path, result: IngestResult) -> list[dict[str, str]] | No
         if absent:
             result.add_diagnostic(
                 "fatal",
-                i,
+                row_number,
                 str(absent),
                 f"row is missing field(s): {absent}; "
                 "use an empty field (two adjacent commas) for optional absent values",
@@ -253,7 +319,7 @@ def _read_raw_csv(path: Path, result: IngestResult) -> list[dict[str, str]] | No
         if oversized:
             result.add_diagnostic(
                 "fatal",
-                i,
+                row_number,
                 str(oversized),
                 f"field(s) exceed {MAX_FIELD_BYTES}-byte limit",
             )
@@ -262,19 +328,9 @@ def _read_raw_csv(path: Path, result: IngestResult) -> list[dict[str, str]] | No
 
         # Safe: all values are str, None key excluded.
         rows.append({k: v for k, v in row.items() if k is not None})
+        row_number += 1
+
     return rows
-
-
-def _expected_columns(filename: str) -> frozenset[str]:
-    name = Path(filename).name.lower()
-    if "asset" in name:
-        return ASSET_COLUMNS
-    if "finding" in name:
-        return FINDING_COLUMNS
-    if "threat" in name or "evidence" in name:
-        return EVIDENCE_COLUMNS
-    # Fallback: caller should pass explicit type; this path shouldn't be reached
-    return frozenset()
 
 
 # ---------------------------------------------------------------------------
@@ -305,9 +361,28 @@ def _fail(result: IngestResult) -> IngestResult:
     return result
 
 
-def parse_assets(path: Path, as_of: datetime) -> IngestResult:
+def parse_assets(
+    path: Path,
+    as_of: datetime,
+    raw_bytes: bytes | None = None,
+) -> IngestResult:
+    """Parse an assets CSV file.
+
+    If raw_bytes is provided it is used as the file content; the file is not
+    re-read. This ensures the same snapshot is used for parsing and for
+    provenance hashing in the caller.
+
+    If raw_bytes is None, the file is read with a bounded read (at most
+    MAX_FILE_BYTES bytes) before parsing.
+    """
     result = IngestResult(source_file=str(path))
-    rows = _read_raw_csv(path, result)
+
+    if raw_bytes is None:
+        raw_bytes = _read_bounded_bytes(path, result)
+        if raw_bytes is None:
+            return result  # result.fatal already set
+
+    rows = _read_raw_csv(raw_bytes, result, ASSET_COLUMNS)
     if rows is None:
         return result  # result.fatal already set; record lists are empty
 
@@ -365,7 +440,7 @@ def parse_assets(path: Path, as_of: datetime) -> IngestResult:
                     "info",
                     i,
                     "asset_id",
-                    f"identical duplicate of asset_id {asset_id!r}; collapsed",
+                    "identical duplicate; collapsed",
                 )
                 continue
             else:
@@ -374,7 +449,7 @@ def parse_assets(path: Path, as_of: datetime) -> IngestResult:
                     "fatal",
                     i,
                     "asset_id",
-                    f"conflicting duplicate asset_id {asset_id!r}; matching is ambiguous",
+                    "conflicting duplicate; matching is ambiguous",
                 )
                 return _fail(result)
 
@@ -395,9 +470,25 @@ def parse_assets(path: Path, as_of: datetime) -> IngestResult:
     return result
 
 
-def parse_findings(path: Path, as_of: datetime) -> IngestResult:
+def parse_findings(
+    path: Path,
+    as_of: datetime,
+    raw_bytes: bytes | None = None,
+) -> IngestResult:
+    """Parse a findings CSV file.
+
+    If raw_bytes is provided it is used as the file content; the file is not
+    re-read. This ensures the same snapshot is used for parsing and for
+    provenance hashing in the caller.
+    """
     result = IngestResult(source_file=str(path))
-    rows = _read_raw_csv(path, result)
+
+    if raw_bytes is None:
+        raw_bytes = _read_bounded_bytes(path, result)
+        if raw_bytes is None:
+            return result
+
+    rows = _read_raw_csv(raw_bytes, result, FINDING_COLUMNS)
     if rows is None:
         return result  # result.fatal already set; record lists are empty
 
@@ -459,7 +550,7 @@ def parse_findings(path: Path, as_of: datetime) -> IngestResult:
                     "info",
                     i,
                     "finding_id",
-                    f"identical duplicate of finding_id {finding_id!r}; collapsed",
+                    "identical duplicate; collapsed",
                 )
                 continue
             else:
@@ -467,7 +558,7 @@ def parse_findings(path: Path, as_of: datetime) -> IngestResult:
                     "fatal",
                     i,
                     "finding_id",
-                    f"conflicting duplicate finding_id {finding_id!r}",
+                    "conflicting duplicate",
                 )
                 return _fail(result)
 
@@ -483,9 +574,7 @@ def parse_findings(path: Path, as_of: datetime) -> IngestResult:
                     "info",
                     i,
                     "finding_id",
-                    f"possible_duplicate: asset_id {asset_id!r} + vulnerability_id "
-                    f"{vulnerability_id!r} also appears in finding_id "
-                    f"{seen_asset_vuln[key]!r}",
+                    "possible_duplicate: (asset_id, vulnerability_id) pair in an earlier finding",
                 )
             else:
                 seen_asset_vuln[key] = finding_id
@@ -508,9 +597,25 @@ def parse_findings(path: Path, as_of: datetime) -> IngestResult:
     return result
 
 
-def parse_threat_evidence(path: Path, as_of: datetime) -> IngestResult:
+def parse_threat_evidence(
+    path: Path,
+    as_of: datetime,
+    raw_bytes: bytes | None = None,
+) -> IngestResult:
+    """Parse a threat evidence CSV file.
+
+    If raw_bytes is provided it is used as the file content; the file is not
+    re-read. This ensures the same snapshot is used for parsing and for
+    provenance hashing in the caller.
+    """
     result = IngestResult(source_file=str(path))
-    rows = _read_raw_csv(path, result)
+
+    if raw_bytes is None:
+        raw_bytes = _read_bounded_bytes(path, result)
+        if raw_bytes is None:
+            return result
+
+    rows = _read_raw_csv(raw_bytes, result, EVIDENCE_COLUMNS)
     if rows is None:
         return result  # result.fatal already set; record lists are empty
 
@@ -565,7 +670,7 @@ def parse_threat_evidence(path: Path, as_of: datetime) -> IngestResult:
                     "info",
                     i,
                     "evidence_id",
-                    f"identical duplicate of evidence_id {evidence_id!r}; collapsed",
+                    "identical duplicate; collapsed",
                 )
                 continue
             else:
@@ -573,7 +678,7 @@ def parse_threat_evidence(path: Path, as_of: datetime) -> IngestResult:
                     "fatal",
                     i,
                     "evidence_id",
-                    f"conflicting duplicate evidence_id {evidence_id!r}",
+                    "conflicting duplicate",
                 )
                 return _fail(result)
 

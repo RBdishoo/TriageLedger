@@ -9,10 +9,11 @@ Exit codes:
   3  Completed successfully; at least one decision carries a review flag.
 
 Publication semantics:
-  All artifacts are staged in a uniquely created temporary sibling directory. The
-  destination is checked for conflicts before any write begins. On success, the
-  temporary directory is published by renaming it to the destination. On failure,
-  the temporary directory is removed and no partial artifacts reach the destination.
+  All artifacts — including the diagnostics-only output produced on fatal ingestion —
+  are staged in a uniquely created temporary sibling directory. The destination is
+  checked for conflicts before any write begins. On success, the temporary directory
+  is published by renaming it to the destination. On failure, the temporary directory
+  is removed and no partial artifacts reach the destination.
 
   --overwrite is not supported in v1. A fresh output directory is always required.
   Existing destinations (directory, regular file, or symlink) are rejected.
@@ -36,7 +37,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from triageledger.ingest import parse_assets, parse_findings, parse_threat_evidence
+from triageledger.ingest import MAX_FILE_BYTES, parse_assets, parse_findings, parse_threat_evidence
 from triageledger.models import IngestResult
 from triageledger.policy import evaluate, load_policy
 from triageledger.reporting import (
@@ -147,6 +148,28 @@ def _check_destination(dest: Path) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Bounded input read
+# ---------------------------------------------------------------------------
+
+
+def _read_bounded_input(path: Path) -> bytes:
+    """Read a CLI input file with a size limit.
+
+    Reads at most MAX_FILE_BYTES + 1 bytes. Raises ValueError if the file
+    exceeds MAX_FILE_BYTES bytes, or OSError if the file cannot be read.
+
+    The returned bytes are the same snapshot that should be passed to the
+    parse/load functions so that parsing and provenance hashing use identical
+    content.
+    """
+    with path.open("rb") as f:
+        data = f.read(MAX_FILE_BYTES + 1)
+    if len(data) > MAX_FILE_BYTES:
+        raise ValueError(f"input file exceeds {MAX_FILE_BYTES}-byte limit: {path}")
+    return data
+
+
+# ---------------------------------------------------------------------------
 # Evaluate subcommand
 # ---------------------------------------------------------------------------
 
@@ -174,61 +197,85 @@ def _run_evaluate(args: argparse.Namespace) -> int:  # noqa: C901  (branchy by d
         print(f"Error: {collision_msg}", file=sys.stderr)
         return 1
 
-    # Read input bytes once; reuse for parsing and provenance hashing.
-    # Do not re-read files later so provenance reflects the actual parsed snapshot.
+    # Read all input files once with a bounded read; reuse the captured bytes
+    # for both parsing and provenance hashing. This guarantees that the hash
+    # reflects the actual parsed content.
     try:
-        assets_bytes = assets_path.read_bytes()
-        findings_bytes = findings_path.read_bytes()
-        evidence_bytes = evidence_path.read_bytes()
-        policy_bytes = policy_path.read_bytes()
-    except OSError as exc:
+        assets_bytes = _read_bounded_input(assets_path)
+        findings_bytes = _read_bounded_input(findings_path)
+        evidence_bytes = _read_bounded_input(evidence_path)
+        policy_bytes = _read_bounded_input(policy_path)
+    except (OSError, ValueError) as exc:
         print(f"Error: Cannot read input file: {exc}", file=sys.stderr)
         return 2
 
-    # Parse all three CSVs.
-    assets_result = parse_assets(assets_path, as_of)
-    findings_result = parse_findings(findings_path, as_of)
-    evidence_result = parse_threat_evidence(evidence_path, as_of)
+    # Parse all three CSVs using the pre-captured bytes (no re-read).
+    assets_result = parse_assets(assets_path, as_of, assets_bytes)
+    findings_result = parse_findings(findings_path, as_of, findings_bytes)
+    evidence_result = parse_threat_evidence(evidence_path, as_of, evidence_bytes)
     ingest_results: list[IngestResult] = [assets_result, findings_result, evidence_result]
 
-    # Load and validate policy.
+    # Load and validate policy using the pre-captured bytes (no re-read).
     policy = None
     policy_error: str | None = None
+    policy_result = IngestResult(source_file=str(policy_path))
     try:
-        policy = load_policy(policy_path)
+        policy = load_policy(policy_path, policy_bytes)
     except ValueError as exc:
         policy_error = str(exc)
+        policy_result.add_diagnostic("fatal", None, None, policy_error)
+        policy_result.fatal = True
 
     fatal = any(r.fatal for r in ingest_results) or policy_error is not None
 
+    # Results passed to write_diagnostics_json include policy failures so that
+    # structured output captures all fatal errors, not only CSV parse errors.
+    results_for_diag = [*ingest_results, policy_result]
+
     if fatal:
-        # Publish diagnostics-only output and exit 2.
-        # The destination check above already confirmed dest does not exist.
+        # Stage diagnostics-only output in a temp sibling, then publish by rename.
         try:
-            dest.mkdir(parents=True, exist_ok=False)
-        except FileExistsError:
-            # Narrow TOCTOU race: another process created dest between check and mkdir.
-            print(
-                f"Error: Output directory was created by another process: {dest}",
-                file=sys.stderr,
-            )
-            return 1
+            dest.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            print(f"Error: Cannot create output directory: {exc}", file=sys.stderr)
+            print(f"Error: Cannot create parent directory for output: {exc}", file=sys.stderr)
+            return 1
+
+        try:
+            tmp_dir = Path(tempfile.mkdtemp(dir=dest.parent, prefix=dest.name + "_tmp_"))
+        except OSError as exc:
+            print(f"Error: Cannot create staging directory: {exc}", file=sys.stderr)
             return 1
 
         try:
             write_diagnostics_json(
-                ingest_results,
+                results_for_diag,
                 run_id=None,
                 as_of=as_of,
-                path=dest / "diagnostics.json",
+                path=tmp_dir / "diagnostics.json",
             )
         except OSError as exc:
-            # Operational failure: diagnostics could not be written.
+            shutil.rmtree(tmp_dir, ignore_errors=True)
             print(f"Error: Could not write diagnostics: {exc}", file=sys.stderr)
             return 1
 
+        # Re-check destination before rename (narrow TOCTOU window).
+        collision_msg = _check_destination(dest)
+        if collision_msg:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            print(f"Error: {collision_msg}", file=sys.stderr)
+            return 1
+
+        try:
+            os.rename(tmp_dir, dest)
+        except OSError as exc:
+            print(
+                f"Error: Cannot publish diagnostics to {dest}: {exc}\n"
+                f"Staged diagnostics preserved at: {tmp_dir}",
+                file=sys.stderr,
+            )
+            return 1
+
+        # Print fatal messages to stderr after successful publication.
         if policy_error:
             print(f"Fatal: {policy_error}", file=sys.stderr)
         for r in ingest_results:
@@ -299,7 +346,7 @@ def _run_evaluate(args: argparse.Namespace) -> int:  # noqa: C901  (branchy by d
         write_queue_csv(decisions, queue_path)
         write_review_csv(decisions, review_path)
         write_briefing_md(decisions, run_id, as_of, policy, briefing_path)
-        write_diagnostics_json(ingest_results, run_id, as_of, diagnostics_path)
+        write_diagnostics_json(results_for_diag, run_id, as_of, diagnostics_path)
 
         artifact_paths = {
             "decisions.json": decisions_path,
