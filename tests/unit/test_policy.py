@@ -240,7 +240,7 @@ def test_load_policy_negative_freshness_rejected(tmp_path: Path) -> None:
 def test_load_policy_invalid_json_rejected(tmp_path: Path) -> None:
     p = tmp_path / "policy.json"
     p.write_text("not valid json {{{", encoding="utf-8")
-    with pytest.raises(ValueError, match="Invalid JSON"):
+    with pytest.raises(ValueError, match="not valid JSON"):
         load_policy(p)
 
 
@@ -254,6 +254,67 @@ def test_load_policy_not_object_rejected(tmp_path: Path) -> None:
 def test_load_policy_missing_file_raises(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Cannot read"):
         load_policy(tmp_path / "nonexistent.json")
+
+
+# ---------------------------------------------------------------------------
+# load_policy — diagnostic redaction
+# ---------------------------------------------------------------------------
+
+
+def test_load_policy_unknown_key_name_not_in_message(tmp_path: Path) -> None:
+    """An unexpected JSON key name must not appear in the ValueError message.
+
+    Embedding supplied key names risks exposing untrusted data in stderr and
+    structured diagnostics output.
+    """
+    sentinel = "SNSV_MARKER_POLICYKEY_XYZ"
+    d = _valid_policy_dict()
+    d[sentinel] = "surprise"
+    p = tmp_path / "policy.json"
+    p.write_text(json.dumps(d), encoding="utf-8")
+    with pytest.raises(ValueError) as exc_info:
+        load_policy(p)
+    assert sentinel not in str(exc_info.value), (
+        f"Sentinel key name leaked into error message: {exc_info.value!r}"
+    )
+    assert "Unknown keys present" in str(exc_info.value)
+
+
+def test_load_policy_json_decode_error_no_exc_detail(tmp_path: Path) -> None:
+    """JSONDecodeError exception detail must not appear in the ValueError message."""
+    p = tmp_path / "policy.json"
+    p.write_text("{invalid json content here}", encoding="utf-8")
+    with pytest.raises(ValueError) as exc_info:
+        load_policy(p)
+    msg = str(exc_info.value)
+    # Python's json decoder includes column numbers and char snippets. Verify absent.
+    assert "line" not in msg.lower() or "not valid" in msg, (
+        f"JSONDecodeError detail may have leaked: {msg!r}"
+    )
+    assert "not valid JSON" in msg
+
+
+def test_load_policy_invalid_utf8_via_bytes_no_exc_detail(tmp_path: Path) -> None:
+    """UnicodeDecodeError exception detail must not appear when supplied as bytes."""
+    p = tmp_path / "policy.json"
+    p.write_bytes(b"valid start \xff\xfe invalid utf-8")
+    raw_bytes = p.read_bytes()
+    with pytest.raises(ValueError) as exc_info:
+        load_policy(p, raw_bytes)
+    msg = str(exc_info.value)
+    assert "not valid UTF-8" in msg
+    assert "codec" not in msg.lower(), f"UnicodeDecodeError detail leaked: {msg!r}"
+
+
+def test_load_policy_invalid_utf8_via_path_no_exc_detail(tmp_path: Path) -> None:
+    """UnicodeDecodeError exception detail must not appear on the direct path-loading route."""
+    p = tmp_path / "policy.json"
+    p.write_bytes(b"valid start \xff\xfe invalid utf-8")
+    with pytest.raises(ValueError) as exc_info:
+        load_policy(p)
+    msg = str(exc_info.value)
+    assert "not valid UTF-8" in msg
+    assert "codec" not in msg.lower(), f"UnicodeDecodeError detail leaked: {msg!r}"
 
 
 # ---------------------------------------------------------------------------

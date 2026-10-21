@@ -64,24 +64,26 @@ def load_policy(path: Path, raw_bytes: bytes | None = None) -> PolicyConfig:
         try:
             raw = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as exc:
-            raise ValueError(f"Cannot decode policy file {path}: {exc}") from exc
+            raise ValueError(f"Cannot decode policy file {path}: not valid UTF-8") from exc
     else:
         try:
             raw = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Cannot decode policy file {path}: not valid UTF-8") from exc
         except OSError as exc:
             raise ValueError(f"Cannot read policy file {path}: {exc}") from exc
 
     try:
         data: Any = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON in policy file {path}: {exc}") from exc
+        raise ValueError(f"Policy file {path} is not valid JSON") from exc
 
     if not isinstance(data, dict):
         raise ValueError("Policy must be a JSON object at the top level")
 
     unknown = set(data.keys()) - _REQUIRED_POLICY_KEYS
     if unknown:
-        raise ValueError(f"Unknown keys in policy: {sorted(unknown)}")
+        raise ValueError("Unknown keys present in policy")
 
     missing = _REQUIRED_POLICY_KEYS - set(data.keys())
     if missing:

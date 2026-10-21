@@ -724,6 +724,46 @@ class TestPolicyFailureDiagnostics:
             diag_text = (out / "diagnostics.json").read_text(encoding="utf-8")
             assert sentinel not in diag_text, "Sentinel value found in diagnostics.json"
 
+    def test_unknown_policy_key_name_not_in_stderr_or_diagnostics(self, tmp_path: Path) -> None:
+        """An unexpected JSON key name in a bad policy must not appear in stderr or diagnostics."""
+        sentinel = "SNSV_MARKER_POLICYKEY_CLI_XYZ"
+        d = {
+            "policy_id": "test",
+            "version": "1.0.0",
+            "description": "test",
+            "context_freshness_days": 30,
+            "evidence_freshness_days": 7,
+            "rules": ["EX-01", "P-01", "P-02", "P-03", "P-04", "P-05", "P-06", "P-07"],
+            sentinel: "injected",
+        }
+        bad_policy = tmp_path / "bad_policy.json"
+        bad_policy.write_text(json.dumps(d), encoding="utf-8")
+        out = tmp_path / "out"
+
+        r = _run(
+            [
+                "evaluate",
+                "--assets",
+                str(_SAMPLES / "assets.csv"),
+                "--findings",
+                str(_SAMPLES / "findings.csv"),
+                "--threat-evidence",
+                str(_SAMPLES / "threat_evidence.csv"),
+                "--policy",
+                str(bad_policy),
+                "--as-of",
+                _AS_OF,
+                "--output-dir",
+                str(out),
+            ]
+        )
+
+        assert r.returncode == 2
+        assert sentinel not in r.stderr, f"Sentinel found in stderr: {r.stderr!r}"
+        if (out / "diagnostics.json").exists():
+            diag_text = (out / "diagnostics.json").read_text(encoding="utf-8")
+            assert sentinel not in diag_text, "Sentinel found in diagnostics.json"
+
 
 # ---------------------------------------------------------------------------
 # In-process partial-write failure tests

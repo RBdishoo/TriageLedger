@@ -145,9 +145,9 @@ specified. They do not validate real-world prioritization effectiveness.
 - Strict CSV parsing with per-row diagnostics and duplicate normalization
 - Versioned policy evaluation (EX-01, P-01 through P-07) with first-match semantics
 - Explicit uncertainty flags for stale context, missing assets, unknown severity, conflicting evidence
-- Deterministic artifacts: same inputs + policy + as-of + tool version + absolute input paths produce byte-identical output
+- Deterministic artifacts: same inputs + policy + as-of + tool version + identical input-path strings produce byte-identical output
 - CSV formula injection mitigation and Markdown injection escaping
-- Atomic staged output; no partial writes reach the destination on failure
+- Artifacts staged in a temporary sibling directory and published by rename; no partial writes reach the destination on failure
 
 ## Not implemented in v1
 
